@@ -17,8 +17,10 @@
 
 package org.dromara.dynamictp.common.plugin;
 
-import net.sf.cglib.proxy.MethodInterceptor;
-import net.sf.cglib.proxy.MethodProxy;
+import net.bytebuddy.implementation.bind.annotation.AllArguments;
+import net.bytebuddy.implementation.bind.annotation.Origin;
+import net.bytebuddy.implementation.bind.annotation.RuntimeType;
+import net.bytebuddy.implementation.bind.annotation.This;
 import org.apache.commons.collections4.CollectionUtils;
 
 import java.lang.reflect.Method;
@@ -29,7 +31,7 @@ import java.util.Set;
  * @author windsearcher.lq
  * @since 1.1.4
  */
-public class DtpInterceptorProxy implements MethodInterceptor {
+public class DtpInterceptorProxy {
 
     private final Object target;
 
@@ -43,13 +45,12 @@ public class DtpInterceptorProxy implements MethodInterceptor {
         this.signatureMap = signatureMap;
     }
 
-    @Override
-    public Object intercept(Object object, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
+    @RuntimeType
+    public Object intercept(@This Object proxy, @Origin Method method, @AllArguments Object[] args) throws Throwable {
         Set<Method> methods = signatureMap.get(method.getDeclaringClass());
         if (CollectionUtils.isNotEmpty(methods) && methods.contains(method)) {
             return interceptor.intercept(new DtpInvocation(target, method, args));
         }
-
         return method.invoke(target, args);
     }
 }

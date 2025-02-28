@@ -18,7 +18,9 @@
 package org.dromara.dynamictp.common.plugin;
 
 import com.google.common.collect.Maps;
-import net.sf.cglib.proxy.Enhancer;
+import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.implementation.MethodDelegation;
+import net.bytebuddy.matcher.ElementMatchers;
 
 import java.lang.reflect.Method;
 import java.util.HashSet;
@@ -43,13 +45,26 @@ public class DtpInterceptorProxyFactory {
         if (!signatureMap.containsKey(target.getClass())) {
             return target;
         }
-        Enhancer enhancer = new Enhancer();
-        enhancer.setSuperclass(target.getClass());
-        enhancer.setCallback(new DtpInterceptorProxy(target, interceptor, signatureMap));
-        if (Objects.isNull(argumentTypes) || Objects.isNull(arguments)) {
-            return enhancer.create();
+
+        try {
+            // 使用 Byte Buddy 创建代理类
+            Class<?> dynamicType = new ByteBuddy()
+                    .subclass(target.getClass())
+                    .method(ElementMatchers.isPublic()) // 匹配所有公共方法
+                    .intercept(MethodDelegation.to(new DtpInterceptorProxy(target, interceptor, signatureMap)))
+                    .make()
+                    .load(target.getClass().getClassLoader())
+                    .getLoaded();
+
+            // 创建代理实例
+            if (Objects.isNull(argumentTypes) || Objects.isNull(arguments)) {
+                return dynamicType.getDeclaredConstructor().newInstance();
+            } else {
+                return dynamicType.getDeclaredConstructor(argumentTypes).newInstance(arguments);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create proxy", e);
         }
-        return enhancer.create(argumentTypes, arguments);
     }
 
     private static Map<Class<?>, Set<Method>> getSignatureMap(DtpInterceptor interceptor) {
